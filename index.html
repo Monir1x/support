@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="bn">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Customer Complaint Input</title>
+  <style>
+    :root{font-family:system-ui,-apple-system,Segoe UI,Roboto,'Helvetica Neue',Arial}
+    body{max-width:900px;margin:28px auto;padding:16px}
+    h1{font-size:20px;margin-bottom:6px}
+    form{display:grid;gap:10px;background:#f9f9f9;padding:12px;border-radius:8px;border:1px solid #eee}
+    label{font-weight:600}
+    input[type=text],input[type=date],select,textarea{width:100%;padding:8px;border-radius:6px;border:1px solid #ccc}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .actions{display:flex;gap:8px;justify-content:flex-end;margin-top:6px}
+    button{padding:8px 12px;border-radius:6px;border:0;background:#0366d6;color:white;cursor:pointer}
+    button.ghost{background:#6c757d}
+    table{width:100%;border-collapse:collapse;margin-top:16px}
+    th,td{padding:8px;border:1px solid #e6e6e6;text-align:left}
+    th{background:#f2f4f6}
+    .small{font-size:13px;color:#555}
+    @media(max-width:640px){.row{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <h1>Customer Complaint — Input Form</h1>
+  <p class="small">Date, Customer Name, Department, Customer Complain — চারটিই ইনপুট দিয়ে নিচে টেবিলে দেখাবে।</p>
+
+  <form id="complaintForm">
+    <div class="row">
+      <div>
+        <label for="date">Date</label>
+        <input type="date" id="date" required>
+      </div>
+      <div>
+        <label for="customer">Customer Name</label>
+        <input type="text" id="customer" placeholder="Customer name" required>
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label for="department">Department</label>
+        <select id="department" required>
+          <option value="">-- Select Department --</option>
+          <option>Sales</option>
+          <option>Support</option>
+          <option>Billing</option>
+          <option>IT</option>
+          <option>Other</option>
+        </select>
+      </div>
+      <div>
+        <label for="complain">Customer Complain</label>
+        <textarea id="complain" rows="2" placeholder="Write complaint details..." required></textarea>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button type="submit">Add Entry</button>
+      <button type="button" id="clearLocal" class="ghost">Clear Saved</button>
+      <button type="button" id="exportCsv" class="ghost">Export CSV</button>
+    </div>
+  </form>
+
+  <table id="entriesTable">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Date</th>
+        <th>Customer Name</th>
+        <th>Department</th>
+        <th>Customer Complain</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <script>
+    const form = document.getElementById('complaintForm');
+    const tableBody = document.querySelector('#entriesTable tbody');
+    const STORAGE_KEY = 'complaints_entries_v1';
+
+    let entries = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+
+    function render() {
+      tableBody.innerHTML = '';
+      entries.forEach((e,i)=>{
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${i+1}</td>
+          <td>${escapeHtml(e.date)}</td>
+          <td>${escapeHtml(e.customer)}</td>
+          <td>${escapeHtml(e.department)}</td>
+          <td>${escapeHtml(e.complain)}</td>
+          <td><button data-index="${i}" class="delBtn">Delete</button></td>
+        `;
+        tableBody.appendChild(tr);
+      });
+      attachDelete();
+    }
+
+    function escapeHtml(str){
+      if(!str) return '';
+      return str.replace(/[&<>"']/g, function(m){return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"})[m];});
+    }
+
+    function attachDelete(){
+      document.querySelectorAll('.delBtn').forEach(btn => {
+        btn.onclick = (ev)=>{
+          const idx = Number(ev.target.dataset.index);
+          if(confirm('Are you sure to delete this entry?')){
+            entries.splice(idx,1);
+            saveAndRender();
+          }
+        }
+      })
+    }
+
+    function saveAndRender(){
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+      render();
+    }
+
+    form.addEventListener('submit', e=>{
+      e.preventDefault();
+      const data = {
+        date: document.getElementById('date').value,
+        customer: document.getElementById('customer').value.trim(),
+        department: document.getElementById('department').value,
+        complain: document.getElementById('complain').value.trim()
+      };
+      // simple validation
+      if(!data.date || !data.customer || !data.department || !data.complain){
+        alert('Please fill all fields.');
+        return;
+      }
+      entries.push(data);
+      saveAndRender();
+      form.reset();
+      // set date field to today by default after reset
+      document.getElementById('date').value = new Date().toISOString().slice(0,10);
+    });
+
+    document.getElementById('clearLocal').addEventListener('click', ()=>{
+      if(confirm('Clear all saved entries?')){
+        entries = [];
+        saveAndRender();
+      }
+    });
+
+    document.getElementById('exportCsv').addEventListener('click', ()=>{
+      if(entries.length===0){ alert('No entries to export'); return; }
+      const header = ['Date','Customer Name','Department','Customer Complain'];
+      const rows = entries.map(e=>[e.date,e.customer,e.department,e.complain]);
+      const csv = [header, ...rows].map(r=>r.map(cell=>`"${String(cell).replace(/"/g,'""')}"`).join(',')).join('\n');
+      const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'complaints.csv';
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    // default date to today
+    document.getElementById('date').value = new Date().toISOString().slice(0,10);
+
+    // initial render
+    render();
+  </script>
+</body>
+</html>
