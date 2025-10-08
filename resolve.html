@@ -5,48 +5,29 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Resolved Complaints</title>
   <style>
-    body {
-      max-width:900px; margin:28px auto; padding:16px; 
-      font-family:system-ui,-apple-system,Segoe UI,Roboto,'Helvetica Neue',Arial
-    }
+    body { max-width:900px; margin:28px auto; padding:16px; font-family:system-ui,-apple-system,Segoe UI,Roboto,'Helvetica Neue',Arial }
     h1 {font-size:22px;margin-bottom:12px}
     table {width:100%;border-collapse:collapse;margin-top:16px;}
     th,td {padding:8px;border:1px solid #e6e6e6;text-align:left;}
     th {background:#f2f4f6;}
     button {padding:6px 10px;border:none;border-radius:4px;background:#28a745;color:white;cursor:pointer;}
     .backBtn {margin-top:16px;padding:8px 12px;border:none;background:#0366d6;color:white;border-radius:6px;cursor:pointer;}
-    
     /* Modal style */
-    .modal {
-      display:none;
-      position:fixed;
-      z-index:1000;
-      left:0; top:0;
-      width:100%; height:100%;
-      overflow:auto;
-      background-color: rgba(0,0,0,0.5);
-    }
-    .modal-content {
-      background:#fff;
-      margin:10% auto;
-      padding:20px;
-      border-radius:6px;
-      width:90%; max-width:500px;
-    }
+    .modal { display:none; position:fixed; z-index:1000; left:0; top:0; width:100%; height:100%; overflow:auto; background-color: rgba(0,0,0,0.5); }
+    .modal-content { background:#fff; margin:5% auto; padding:20px; border-radius:6px; width:90%; max-width:600px; max-height:90vh; overflow-y:auto; }
     .modal-content label {display:block;margin:6px 0;font-weight:600;}
-    .modal-content input, .modal-content textarea {
-      width:100%; padding:8px; margin-bottom:10px; border:1px solid #ccc; border-radius:4px; box-sizing:border-box;
-    }
+    .modal-content input, .modal-content textarea { width:100%; padding:8px; margin-bottom:10px; border:1px solid #ccc; border-radius:4px; box-sizing:border-box; }
     .modal-content button {margin-right:8px;}
   </style>
 </head>
 <body>
   <h1>Resolved Complaint Details</h1>
-
+  
   <table id="resolveTable">
     <thead>
       <tr>
         <th>#</th>
+        <th>Organization</th>
         <th>Customer</th>
         <th>Department</th>
         <th>Location</th>
@@ -63,17 +44,53 @@
   <!-- Modal for editing -->
   <div id="editModal" class="modal">
     <div class="modal-content">
-      <h3>Edit Complaint</h3>
+      <h3>Complaint Details</h3>
+
+      <label>Organization</label>
+      <input type="text" id="editOrganization">
+
       <label>Customer</label>
       <input type="text" id="editCustomer">
+
+      <label>Customer IP</label>
+      <input type="text" id="editCustomerIP">
+
       <label>Department</label>
       <input type="text" id="editDepartment">
+
       <label>Location</label>
       <input type="text" id="editLocation">
+
+      <label>Initial Findings</label>
+      <textarea id="editInitialFindings" rows="2"></textarea>
+
       <label>Complain</label>
       <textarea id="editComplain" rows="3"></textarea>
+
+      <label>Provided Solution</label>
+      <textarea id="editProvidedSolution" rows="2"></textarea>
+
+      <label>PC</label>
+      <input type="text" id="editPC">
+
+      <label>Printer</label>
+      <input type="text" id="editPrinter">
+
+      <label>Response Time</label>
+      <input type="text" id="editResponseTime">
+
+      <label>Work Progress Status</label>
+      <input type="text" id="editWorkProgressStatus">
+
+      <label>Resolved By</label>
+      <input type="text" id="editResolvedBy">
+
+      <label>Duration</label>
+      <input type="text" id="editDuration">
+
       <label>Submitted At</label>
       <input type="text" id="editSubmittedAt" readonly>
+
       <div>
         <button id="saveBtn">Save</button>
         <button id="closeBtn">Close</button>
@@ -82,11 +99,11 @@
   </div>
 
   <script>
-    // get existing resolved entries
+    // Load existing resolved entries
     let resolvedEntries = JSON.parse(sessionStorage.getItem('resolved_entries') || '[]');
-
-    // check if new single entry just came from index.html
     const newEntry = JSON.parse(sessionStorage.getItem('resolveEntry'));
+
+    // If new entry came from index.html
     if(newEntry){
       resolvedEntries.push(newEntry);
       sessionStorage.setItem('resolved_entries', JSON.stringify(resolvedEntries));
@@ -95,10 +112,11 @@
 
     const tbody = document.querySelector('#resolveTable tbody');
 
+    // Render Table (show only limited columns)
     function renderTable(){
       tbody.innerHTML = '';
       if(resolvedEntries.length === 0){
-        tbody.innerHTML = `<tr><td colspan="7">No data available</td></tr>`;
+        tbody.innerHTML = '<tr><td colspan="8">No data available</td></tr>';
         return;
       }
 
@@ -106,16 +124,16 @@
         const tr = document.createElement('tr');
         tr.innerHTML = `
           <td>${i+1}</td>
-          <td>${entry.customer}</td>
-          <td>${entry.department}</td>
-          <td>${entry.location}</td>
-          <td>${entry.complain}</td>
-          <td>${entry.submittedAt}</td>
+          <td>${entry.organization || ''}</td>
+          <td>${entry.customer || ''}</td>
+          <td>${entry.department || ''}</td>
+          <td>${entry.location || ''}</td>
+          <td>${entry.complain || ''}</td>
+          <td>${entry.submittedAt || ''}</td>
           <td><button class="previewBtn" data-index="${i}">Preview</button></td>
         `;
         tbody.appendChild(tr);
       });
-
       attachPreview();
     }
 
@@ -128,50 +146,52 @@
       });
     }
 
+    // Modal elements
     const modal = document.getElementById('editModal');
-    const editCustomer = document.getElementById('editCustomer');
-    const editDepartment = document.getElementById('editDepartment');
-    const editLocation = document.getElementById('editLocation');
-    const editComplain = document.getElementById('editComplain');
-    const editSubmittedAt = document.getElementById('editSubmittedAt');
+    const fields = {
+      organization: document.getElementById('editOrganization'),
+      customer: document.getElementById('editCustomer'),
+      customerIP: document.getElementById('editCustomerIP'),
+      department: document.getElementById('editDepartment'),
+      location: document.getElementById('editLocation'),
+      initialFindings: document.getElementById('editInitialFindings'),
+      complain: document.getElementById('editComplain'),
+      providedSolution: document.getElementById('editProvidedSolution'),
+      PC: document.getElementById('editPC'),
+      Printer: document.getElementById('editPrinter'),
+      responseTime: document.getElementById('editResponseTime'),
+      workProgressStatus: document.getElementById('editWorkProgressStatus'),
+      resolvedBy: document.getElementById('editResolvedBy'),
+      duration: document.getElementById('editDuration'),
+      submittedAt: document.getElementById('editSubmittedAt')
+    };
+
     let currentIndex = null;
 
     function openModal(idx){
       currentIndex = idx;
       const entry = resolvedEntries[idx];
-      editCustomer.value = entry.customer;
-      editDepartment.value = entry.department;
-      editLocation.value = entry.location;
-      editComplain.value = entry.complain;
-      editSubmittedAt.value = entry.submittedAt;
+      for(const key in fields){
+        fields[key].value = entry[key] || '';
+      }
       modal.style.display = 'block';
     }
 
+    // Save button
     document.getElementById('saveBtn').onclick = ()=>{
       if(currentIndex !== null){
-        resolvedEntries[currentIndex] = {
-          customer: editCustomer.value,
-          department: editDepartment.value,
-          location: editLocation.value,
-          complain: editComplain.value,
-          submittedAt: editSubmittedAt.value
-        };
+        for(const key in fields){
+          resolvedEntries[currentIndex][key] = fields[key].value;
+        }
         sessionStorage.setItem('resolved_entries', JSON.stringify(resolvedEntries));
         renderTable();
         modal.style.display = 'none';
       }
     };
 
-    document.getElementById('closeBtn').onclick = ()=>{
-      modal.style.display = 'none';
-    };
-
-    // Click outside modal to close
-    window.onclick = function(event) {
-      if (event.target == modal) {
-        modal.style.display = "none";
-      }
-    }
+    // Close modal
+    document.getElementById('closeBtn').onclick = ()=>{ modal.style.display = 'none'; };
+    window.onclick = function(event){ if(event.target == modal) modal.style.display="none"; }
 
     renderTable();
   </script>
