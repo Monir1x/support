@@ -10,17 +10,15 @@
     h1{font-size:20px;margin-bottom:6px}
     form{display:grid;gap:14px;background:#f9f9f9;padding:16px;border-radius:8px;border:1px solid #eee}
     label{font-weight:600;display:block;margin-bottom:4px}
-    input[type=text],input[type=date],input[type=time],select,textarea{
+    input[type=text],select,textarea{
       width:100%;padding:8px;border-radius:6px;border:1px solid #ccc;box-sizing:border-box;
     }
     .row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
     .actions{display:flex;gap:8px;justify-content:flex-end;margin-top:6px}
     button{padding:8px 12px;border-radius:6px;border:0;background:#0366d6;color:white;cursor:pointer}
-    button.ghost{background:#6c757d}
     table{width:100%;border-collapse:collapse;margin-top:16px}
     th,td{padding:8px;border:1px solid #e6e6e6;text-align:left}
     th{background:#f2f4f6}
-    .small{font-size:13px;color:#555}
     @media(max-width:640px){.row{grid-template-columns:1fr}}
   </style>
 </head>
@@ -29,17 +27,6 @@
   <h1>Input Form</h1>
 
   <form id="complaintForm">
-    <div class="row">
-      <div>
-        <label for="date">Date</label>
-        <input type="date" id="date" required>
-      </div>
-      <div>
-        <label for="time">Time</label>
-        <input type="time" id="time" required>
-      </div>
-    </div>
-
     <div class="row">
       <div>
         <label for="customer">Customer Name</label>
@@ -58,14 +45,19 @@
       </div>
     </div>
 
-    <div>
-      <label for="complain">Customer Complain</label>
-      <textarea id="complain" rows="2" placeholder="Write complaint details..." required></textarea>
+    <div class="row">
+      <div>
+        <label for="location">Location</label>
+        <input type="text" id="location" placeholder="Enter location" required>
+      </div>
+      <div>
+        <label for="complain">Customer Complain</label>
+        <textarea id="complain" rows="2" placeholder="Write complaint details..." required></textarea>
+      </div>
     </div>
 
     <div class="actions">
       <button type="submit">Add Entry</button>
-      <button type="button" id="exportCsv" class="ghost">Export CSV</button>
     </div>
   </form>
 
@@ -73,10 +65,10 @@
     <thead>
       <tr>
         <th>#</th>
-        <th>Date</th>
-        <th>Time</th>
+        <th>Submitted Date & Time</th>
         <th>Customer Name</th>
         <th>Department</th>
+        <th>Location</th>
         <th>Customer Complain</th>
         <th>Action</th>
       </tr>
@@ -87,7 +79,7 @@
   <script>
     const form = document.getElementById('complaintForm');
     const tableBody = document.querySelector('#entriesTable tbody');
-    const STORAGE_KEY = 'complaints_entries_v2';
+    const STORAGE_KEY = 'complaints_entries_v5';
     let entries = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
 
     function render() {
@@ -96,31 +88,37 @@
         const tr = document.createElement('tr');
         tr.innerHTML = `
           <td>${i+1}</td>
-          <td>${escapeHtml(e.date)}</td>
-          <td>${escapeHtml(e.time)}</td>
+          <td>${escapeHtml(e.submittedAt)}</td>
           <td>${escapeHtml(e.customer)}</td>
           <td>${escapeHtml(e.department)}</td>
+          <td>${escapeHtml(e.location)}</td>
           <td>${escapeHtml(e.complain)}</td>
-          <td><button data-index="${i}" class="delBtn">Delete</button></td>
+          <td><button data-index="${i}" class="resolveBtn">Resolve</button></td>
         `;
         tableBody.appendChild(tr);
       });
-      attachDelete();
+      attachResolve();
     }
 
     function escapeHtml(str){
       if(!str) return '';
-      return str.replace(/[&<>"']/g, function(m){return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"})[m];});
+      return str.replace(/[&<>"']/g, function(m){
+        return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"})[m];
+      });
     }
 
-    function attachDelete(){
-      document.querySelectorAll('.delBtn').forEach(btn => {
+    function attachResolve(){
+      document.querySelectorAll('.resolveBtn').forEach(btn => {
         btn.onclick = (ev)=>{
           const idx = Number(ev.target.dataset.index);
-          if(confirm('Are you sure to delete this entry?')){
-            entries.splice(idx,1);
-            saveAndRender();
-          }
+          // Save selected entry in sessionStorage
+          sessionStorage.setItem('resolveEntry', JSON.stringify(entries[idx]));
+          // Remove entry from localStorage
+          entries.splice(idx,1);
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+          render(); // update table
+          // Redirect to resolve.html
+          window.location.href = 'resolve.html';
         }
       });
     }
@@ -130,56 +128,31 @@
       render();
     }
 
+    function getCurrentDateTime(){
+      const now = new Date();
+      const date = now.toLocaleDateString('en-GB');
+      const time = now.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+      return `${date} ${time}`;
+    }
+
     form.addEventListener('submit', e=>{
       e.preventDefault();
-      const now = new Date();
-      const selectedDate = new Date(document.getElementById('date').value + 'T' + document.getElementById('time').value);
-      if(selectedDate < now){
-        alert('You cannot select a past date or time!');
-        return;
-      }
-
       const data = {
-        date: document.getElementById('date').value,
-        time: document.getElementById('time').value,
         customer: document.getElementById('customer').value.trim(),
         department: document.getElementById('department').value,
-        complain: document.getElementById('complain').value.trim()
+        location: document.getElementById('location').value.trim(),
+        complain: document.getElementById('complain').value.trim(),
+        submittedAt: getCurrentDateTime()
       };
-
-      if(!data.date || !data.time || !data.customer || !data.department || !data.complain){
+      if(!data.customer || !data.department || !data.location || !data.complain){
         alert('Please fill all fields.');
         return;
       }
-
       entries.push(data);
       saveAndRender();
       form.reset();
-      setCurrentDateTime();
     });
 
-    document.getElementById('exportCsv').addEventListener('click', ()=>{
-      if(entries.length===0){ alert('No entries to export'); return; }
-      const header = ['Date','Time','Customer Name','Department','Customer Complain'];
-      const rows = entries.map(e=>[e.date,e.time,e.customer,e.department,e.complain]);
-      const csv = [header, ...rows].map(r=>r.map(cell=>`"${String(cell).replace(/"/g,'""')}"`).join(',')).join('\n');
-      const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'complaints.csv';
-      a.click();
-      URL.revokeObjectURL(url);
-    });
-
-    function setCurrentDateTime(){
-      const now = new Date();
-      document.getElementById('date').value = now.toISOString().slice(0,10);
-      document.getElementById('time').value = now.toTimeString().slice(0,5);
-      document.getElementById('date').min = document.getElementById('date').value;
-    }
-
-    setCurrentDateTime();
     render();
   </script>
 </body>
