@@ -8,10 +8,12 @@
     :root{font-family:system-ui,-apple-system,Segoe UI,Roboto,'Helvetica Neue',Arial}
     body{max-width:900px;margin:28px auto;padding:16px}
     h1{font-size:20px;margin-bottom:6px}
-    form{display:grid;gap:10px;background:#f9f9f9;padding:12px;border-radius:8px;border:1px solid #eee}
-    label{font-weight:600}
-    input[type=text],input[type=date],select,textarea{width:100%;padding:8px;border-radius:6px;border:1px solid #ccc}
-    .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    form{display:grid;gap:14px;background:#f9f9f9;padding:16px;border-radius:8px;border:1px solid #eee}
+    label{font-weight:600;display:block;margin-bottom:4px}
+    input[type=text],input[type=date],input[type=time],select,textarea{
+      width:100%;padding:8px;border-radius:6px;border:1px solid #ccc;box-sizing:border-box;
+    }
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
     .actions{display:flex;gap:8px;justify-content:flex-end;margin-top:6px}
     button{padding:8px 12px;border-radius:6px;border:0;background:#0366d6;color:white;cursor:pointer}
     button.ghost{background:#6c757d}
@@ -23,8 +25,8 @@
   </style>
 </head>
 <body>
-  <h1>Customer Complaint — Input Form</h1>
-  <p class="small">Date, Customer Name, Department, Customer Complain — চারটিই ইনপুট দিয়ে নিচে টেবিলে দেখাবে।</p>
+  <h2>Customer Complaint</h2>
+  <h1>Input Form</h1>
 
   <form id="complaintForm">
     <div class="row">
@@ -33,32 +35,36 @@
         <input type="date" id="date" required>
       </div>
       <div>
-        <label for="customer">Customer Name</label>
-        <input type="text" id="customer" placeholder="Customer name" required>
+        <label for="time">Time</label>
+        <input type="time" id="time" required>
       </div>
     </div>
 
     <div class="row">
       <div>
+        <label for="customer">Customer Name</label>
+        <input type="text" id="customer" placeholder="Customer name" required>
+      </div>
+      <div>
         <label for="department">Department</label>
         <select id="department" required>
           <option value="">-- Select Department --</option>
-          <option>Sales</option>
-          <option>Support</option>
-          <option>Billing</option>
-          <option>IT</option>
+          <option>Quality Control (QC)</option>
+          <option>Microbiology (MIC)</option>
+          <option>Product Development (PD)</option>
+          <option>Human Resource (HR)</option>
           <option>Other</option>
         </select>
       </div>
-      <div>
-        <label for="complain">Customer Complain</label>
-        <textarea id="complain" rows="2" placeholder="Write complaint details..." required></textarea>
-      </div>
+    </div>
+
+    <div>
+      <label for="complain">Customer Complain</label>
+      <textarea id="complain" rows="2" placeholder="Write complaint details..." required></textarea>
     </div>
 
     <div class="actions">
       <button type="submit">Add Entry</button>
-      <button type="button" id="clearLocal" class="ghost">Clear Saved</button>
       <button type="button" id="exportCsv" class="ghost">Export CSV</button>
     </div>
   </form>
@@ -68,6 +74,7 @@
       <tr>
         <th>#</th>
         <th>Date</th>
+        <th>Time</th>
         <th>Customer Name</th>
         <th>Department</th>
         <th>Customer Complain</th>
@@ -80,8 +87,7 @@
   <script>
     const form = document.getElementById('complaintForm');
     const tableBody = document.querySelector('#entriesTable tbody');
-    const STORAGE_KEY = 'complaints_entries_v1';
-
+    const STORAGE_KEY = 'complaints_entries_v2';
     let entries = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
 
     function render() {
@@ -91,6 +97,7 @@
         tr.innerHTML = `
           <td>${i+1}</td>
           <td>${escapeHtml(e.date)}</td>
+          <td>${escapeHtml(e.time)}</td>
           <td>${escapeHtml(e.customer)}</td>
           <td>${escapeHtml(e.department)}</td>
           <td>${escapeHtml(e.complain)}</td>
@@ -115,7 +122,7 @@
             saveAndRender();
           }
         }
-      })
+      });
     }
 
     function saveAndRender(){
@@ -125,35 +132,36 @@
 
     form.addEventListener('submit', e=>{
       e.preventDefault();
+      const now = new Date();
+      const selectedDate = new Date(document.getElementById('date').value + 'T' + document.getElementById('time').value);
+      if(selectedDate < now){
+        alert('You cannot select a past date or time!');
+        return;
+      }
+
       const data = {
         date: document.getElementById('date').value,
+        time: document.getElementById('time').value,
         customer: document.getElementById('customer').value.trim(),
         department: document.getElementById('department').value,
         complain: document.getElementById('complain').value.trim()
       };
-      // simple validation
-      if(!data.date || !data.customer || !data.department || !data.complain){
+
+      if(!data.date || !data.time || !data.customer || !data.department || !data.complain){
         alert('Please fill all fields.');
         return;
       }
+
       entries.push(data);
       saveAndRender();
       form.reset();
-      // set date field to today by default after reset
-      document.getElementById('date').value = new Date().toISOString().slice(0,10);
-    });
-
-    document.getElementById('clearLocal').addEventListener('click', ()=>{
-      if(confirm('Clear all saved entries?')){
-        entries = [];
-        saveAndRender();
-      }
+      setCurrentDateTime();
     });
 
     document.getElementById('exportCsv').addEventListener('click', ()=>{
       if(entries.length===0){ alert('No entries to export'); return; }
-      const header = ['Date','Customer Name','Department','Customer Complain'];
-      const rows = entries.map(e=>[e.date,e.customer,e.department,e.complain]);
+      const header = ['Date','Time','Customer Name','Department','Customer Complain'];
+      const rows = entries.map(e=>[e.date,e.time,e.customer,e.department,e.complain]);
       const csv = [header, ...rows].map(r=>r.map(cell=>`"${String(cell).replace(/"/g,'""')}"`).join(',')).join('\n');
       const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
       const url = URL.createObjectURL(blob);
@@ -164,10 +172,14 @@
       URL.revokeObjectURL(url);
     });
 
-    // default date to today
-    document.getElementById('date').value = new Date().toISOString().slice(0,10);
+    function setCurrentDateTime(){
+      const now = new Date();
+      document.getElementById('date').value = now.toISOString().slice(0,10);
+      document.getElementById('time').value = now.toTimeString().slice(0,5);
+      document.getElementById('date').min = document.getElementById('date').value;
+    }
 
-    // initial render
+    setCurrentDateTime();
     render();
   </script>
 </body>
